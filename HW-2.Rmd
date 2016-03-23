@@ -8,6 +8,12 @@ output: html_document
 suppressPackageStartupMessages(library(ggplot2))
 suppressPackageStartupMessages(library(dplyr))
 suppressPackageStartupMessages(library(foreign))
+suppressPackageStartupMessages(library(ggthemes))
+suppressPackageStartupMessages(library(pander))
+suppressPackageStartupMessages(library(knitr))
+suppressPackageStartupMessages(library(stringr))
+suppressPackageStartupMessages(library(tidyr))
+suppressPackageStartupMessages(library(DT))
 ```
 
 
@@ -15,11 +21,12 @@ suppressPackageStartupMessages(library(foreign))
 
 Please indicate
 
-* Who you collaborated with:
-* Roughly how much time you spent on this HW:
-* What gave you the most trouble:
-* Any comments you have: 
-
+* Who you collaborated with: Alison Cook
+* Roughly how much time you spent on this HW: 10 
+* What gave you the most trouble:Creating what I imagined in my head, also interpreting basic
+mathematics. Doing something simple took a long time. 
+* Any comments you have:Open ended question left me uncertain of how much to do/I didn't 
+want to waste hours and hours accomplishing very little. 
 
 
 
@@ -45,6 +52,31 @@ pollution <- read.dta(url) %>%
 
 ```{r, echo=FALSE, fig.width=12, fig.height=6}
 
+#Plot out the initial mortality rate vs nitric oxide, add a linear regression via geom_smooth
+ggplot(data = pollution, aes(x = nox, y = mort)) +
+  geom_point()+
+  theme_tufte()+
+  labs(title = "Nitric Oxide Pollution and Mortality", x = "Nitric Oxide Pollution Potential", 
+     y = "Mortality rate per 100,000") +
+  geom_smooth(method = "lm")
+
+#Run the regression and output a basic table 
+lm_nox_mort <- lm(mort ~ nox, data = pollution)
+pander(lm_nox_mort)
+
+#Extract the residuals from the model 
+noxmort_res <- resid(lm_nox_mort)
+
+#Make a plot of the residuals
+ggplot(data = pollution, aes(x = nox, y = noxmort_res))+
+  geom_point()+
+  theme_tufte()+
+  labs(title = "Nitric Oxide Polution and Mortality Model Check", 
+       x = "Nitric Oxide Pollution Potential",
+       y = "Mortality Residuals")
+
+#Residuals not looking good. 
+
 ```
 
 
@@ -52,12 +84,46 @@ pollution <- read.dta(url) %>%
 
 ```{r, echo=FALSE, fig.width=12, fig.height=6}
 
+#Log transform the nitric oxide 
+pollution <- mutate(pollution, log_nox = log10(nox))
+
+#Plot that to see how it looks
+ggplot(pollution, aes(x = log_nox, y = mort))+
+  geom_point()+
+  theme_tufte()+
+  labs(title = "Nitric Oxide Pollution and Mortality", 
+       x = "Nitric Oxide Pollution Potential (log transformed)", 
+       y = "Mortality rate per 100,000") +
+  geom_smooth(method = "lm")
+
+#Run the regression and output a simple table 
+lmlog_nox_mort <- lm(mort ~ log_nox, data = pollution)
+pander(lmlog_nox_mort)
+
+#Extract the residuals 
+lognoxmort_res <- resid(lmlog_nox_mort)
+
+#Plot the residuals, see how they look 
+ggplot(data = pollution, aes(x = log_nox, y = lognoxmort_res))+
+  geom_point()+
+  theme_tufte()+
+  labs(title = "Nitric Oxide Pollution and Mortality Log Model Check", 
+       x = "Nitric Oxide Pollution Potential (log transformed)",
+       y = "Mortality Residuals")
+
+
+
 ```
 
 
 ### c)
 
 ```{r, echo=FALSE, fig.width=12, fig.height=6}
+#Interpret the slope coefficient from the model you chose in (b)
+pander(lmlog_nox_mort)
+#With every increase in 10^x, where x is nitric oxide pollution potential, 
+#there is an increase in mortality rate of 35.31 multiplied by x. 
+
 
 ```
 
@@ -66,6 +132,39 @@ pollution <- read.dta(url) %>%
 
 ```{r, echo=FALSE, fig.width=12, fig.height=6}
 
+#Log transform the sulpher dioxide and hydrocarbon values
+pollution <- mutate(pollution, log_so2 = log10(so2))
+pollution <- mutate(pollution, log_hc = log10(hc))
+
+#Plot the so2 data 
+ggplot(data = pollution, aes(x = log_so2, y = mort)) +
+  geom_point()+
+  theme_tufte()+
+  labs(title = "Sulphur Dioxide Pollution and Mortality", 
+       x = "Sulphur Dioxide Pollution Potential (log transformed)", 
+       y = "Mortality rate per 100,000") +
+  geom_smooth(method = "lm")
+
+#plot the hydrocarbon data 
+ggplot(data = pollution, aes(x = log_hc, y = mort)) +
+  geom_point()+
+  theme_tufte()+
+  labs(title = "Hydrocarbon Pollution and Mortality", 
+       x = "Hydrocarbon Pollution Potential (log transformed)", 
+       y = "Mortality rate per 100,000") +
+  geom_smooth(method = "lm")
+
+#Create regression that takes into account the effects of the other factors
+all_combined <- lm(mort ~ log_nox + log_hc + log_so2, data=pollution)
+pander(all_combined)
+
+#I don't know how to plot this??
+ggplot() +
+  geom_smooth(data = all_combined, method = "lm") +
+  geom_point(data = pollution, aes(log_nox,mort), colour = "blue") +
+  geom_point(data = pollution, aes(log_so2,mort), colour = "green")+
+  geom_point(data = pollution, aes(log_hc,mort), colour = "red")
+
 ```
 
 
@@ -73,11 +172,36 @@ pollution <- read.dta(url) %>%
 
 ```{r, echo=FALSE, fig.width=12, fig.height=6}
 
+x_orig <- data.frame(log_nox = pollution$log_nox[1:30], 
+                     log_hc = pollution$log_hc[1:30],
+                     log_so2 = pollution$log_so2[1:30])
+
+y <- pollution$mort[1:30]
+
+lmfirst_half <- lm(y ~ log_nox + log_hc + log_so2, data=x_orig)
+
+x_new <- data.frame(log_nox = pollution$log_nox[31:60], 
+                    log_hc = pollution$log_hc[31:60],
+                    log_so2 = pollution$log_so2[31:60])
+
+lmsecond_pred <- predict(lmfirst_half, x_new)
+
+ggplot(data = NULL, aes(x = pollution$mort[31:60], y = lmsecond_pred)) +
+  geom_point() +
+  stat_smooth(method = "lm") +
+  labs(title = "How does a model handle new data?", 
+       x = "Observed Mortality Rate",
+       y = "Predicted Mortality Rate")
+
 ```
 
 
 ### f) What do you think are the reasons for using cross-validation?
 
+It allows you to check if your model would work in the "real world". 
+If it is given a random set of new data, it should work for that data too, 
+and splitting the data into two parts is easier than going out and collecting more
+though it does limit the statistical power of your model because of the decreased sample size. 
 
 
 ```{r, echo=FALSE, fig.width=12, fig.height=6}
@@ -112,6 +236,124 @@ profiles <- read.csv("profiles.csv", header=TRUE) %>% tbl_df()
 ```{r, echo=FALSE, fig.width=12, fig.height=6}
 # Feel free to make multiple code blocks, but set echo, fig.width, fig.height as 
 # above
+
+#Seperate out the essays 
+essays <- select(profiles, contains("essay"))
+profiles <- select(profiles, -contains("essay"))
+
+#add a binary column for females
+profiles <- mutate(profiles, is.female = ifelse(sex=="f", 1, 0))
+
+#Lets find out what the body types are 
+body_types <- profiles %>% select(body_type,is.female) %>% 
+  group_by(body_type, is.female) %>% 
+  tally()
+
+#Lets plot out those body types, and fill by gender. Can't figure out how to just 
+#make those values discrete for the legend, I could always just not have it and explain but eh. 
+#I guess I will go with the heteronormative blue and pink for now
+ggplot(data=body_types, aes(x=body_type, y = n, fill= is.female))+
+  geom_bar(stat = "identity")+
+  theme_tufte()+
+  scale_fill_gradient(low = "blue", high = "pink", guide = FALSE)+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.25, hjust = 1)) +
+  #scale_fill_discrete(name = "Key", labels = c(as.factor("Female"),as.factor("Male")))+
+  labs(title = "Body Type Prevalence by Gender", x = "Body Type", y = "Number of Individuals")
+
+#Lets look at occupations
+occupations <- profiles %>% select(job,is.female) %>% 
+  group_by(job, is.female) %>% 
+  tally()
+
+#Let's do the same as above, but for the different jobs
+#Remember to look at relative size of each color for each column, not necessarily comparing one
+#column to the next, these are absolutes, not proportions, and there are more men on okcupid. 
+ggplot(data=occupations, aes(x=job, y = n, fill= is.female))+
+  geom_bar(stat = "identity")+
+  theme_tufte()+
+  scale_fill_gradient(low = "blue", high = "pink", guide = FALSE)+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.25, hjust = 1)) +
+  #scale_fill_discrete(name = "Key", labels = c(as.factor("Female"),as.factor("Male")))+
+  labs(title = "Occupation by Gender", x = "Occupation", y = "Number of Individuals")
+
+#Let's figure out their locations and see if there is a pattern there
+#First seperate the city and states
+profiles <- separate(profiles, location, c("city", "state"), sep = ",")
+
+#Do some grouping
+locations <- profiles %>% select(city,is.female) %>% 
+  group_by(city, is.female) %>% 
+  tally()
+
+#Here is a quick table for this data, before I filter out bits of it
+datatable(locations)
+
+#Filter out the ones that have less than 100 people from that location 
+locations <- locations %>% filter(n > 100)
+
+#Graph that! This looks stupid, should probably leave out SF as that is
+#balanced, but at the same time I don't really see much to go on. Maybe a map version of this
+#would be cooler 
+ggplot(data=locations, aes(x=city, y = n, fill= is.female))+
+  geom_bar(stat = "identity")+
+  theme_tufte()+
+  scale_fill_gradient(low = "blue", high = "pink", guide = FALSE)+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.25, hjust = 1)) +
+  #scale_fill_discrete(name = "Key", labels = c(as.factor("Female"),as.factor("Male")))+
+  labs(title = "Where do different genders live?", x = "Location", y = "Number of Individuals")
+
+
+#Now plot the different cities
+ggplot(data=occupations, aes(x=job, y = n, fill= is.female))+
+  geom_bar(stat = "identity")+
+  theme_tufte()+
+  scale_fill_gradient(low = "blue", high = "pink", guide = FALSE)+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.25, hjust = 1)) +
+  #scale_fill_discrete(name = "Key", labels = c(as.factor("Female"),as.factor("Male")))+
+  labs(title = "Occupation by Gender", x = "Occupation", y = "Number of Individuals")
+
+
+
+#Searching for words functions, first finding it, then returning found word 
+find_query <- function(char.vector, query){
+  which.has.query <- grep(query, char.vector, ignore.case = TRUE)
+  length(which.has.query) != 0
+}
+profile_has_word <- function(data.frame, query){
+  query <- tolower(query)
+  has.query <- apply(data.frame, 1, find_query, query=query)
+  return(has.query)
+}
+
+# Search for the string "read"
+profiles$has.read <- profile_has_word(data.frame = essays, query = "read")
+
+#Making a proportion here. I am trying to understand exaclty what the proportions mean.
+#Is there a way to pull males out of this, is it just "1-value"? Don't really
+#understand. 
+group_by(profiles, has.read) %>% 
+  summarise(prop_female=mean(is.female)) %>% 
+  kable(., digits = 3)
+
+#Same thing here but for "love" instead of the word "read"
+profiles$has.love <- profile_has_word(data.frame = essays, query = "love")
+group_by(profiles, has.love) %>% 
+  summarise(prop_female=mean(is.female)) %>% 
+  kable(., digits = 3)
+
+#I am slowly but surely painting myself as a sexist..."cook" 
+profiles$has.cook <- profile_has_word(data.frame = essays, query = "cook")
+group_by(profiles, has.cook) %>% 
+  summarise(prop_female=mean(is.female)) %>% 
+  kable(., digits = 3)
+
+#Looks like I have no shame..."bake"
+profiles$has.bake <- profile_has_word(data.frame = essays, query = "bake")
+group_by(profiles, has.bake) %>% 
+  summarise(prop_female=mean(is.female)) %>% 
+  kable(., digits = 3)
+
+
 ```
 
 
