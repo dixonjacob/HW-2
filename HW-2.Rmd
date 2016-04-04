@@ -1,6 +1,6 @@
 ---
 title: "MATH 216 Homework 2"
-author: "WRITE YOUR NAME HERE"
+author: "Jacob Dixon"
 output: html_document
 ---
 
@@ -21,12 +21,11 @@ suppressPackageStartupMessages(library(DT))
 
 Please indicate
 
-* Who you collaborated with: Alison Cook
-* Roughly how much time you spent on this HW: 10 
-* What gave you the most trouble:Creating what I imagined in my head, also interpreting basic
-mathematics. Doing something simple took a long time. 
+* Who you collaborated with: Alison Cook and Andrew Holtz
+* Roughly how much time you spent on this HW: 16h
+* What gave you the most trouble:Issues with correctly outputing tables, simple proportion calculations. 
 * Any comments you have:Open ended question left me uncertain of how much to do/I didn't 
-want to waste hours and hours accomplishing very little. 
+want to waste hours and hours accomplishing very little. I am concerned these homework assignments will leave me with little time to work on the independent project for this class. 
 
 
 
@@ -62,7 +61,7 @@ ggplot(data = pollution, aes(x = nox, y = mort)) +
 
 #Run the regression and output a basic table 
 lm_nox_mort <- lm(mort ~ nox, data = pollution)
-pander(lm_nox_mort)
+kable(summary(lm_nox_mort)$coef, digits = 3)
 
 #Extract the residuals from the model 
 noxmort_res <- resid(lm_nox_mort)
@@ -75,10 +74,9 @@ ggplot(data = pollution, aes(x = nox, y = noxmort_res))+
        x = "Nitric Oxide Pollution Potential",
        y = "Mortality Residuals")
 
-#Residuals not looking good. 
-
 ```
 
+Looking at the two figures and table above, we can see that a regression line is not a good fit for the data. The values are clumped to the left side of the x axis, with a few outliers above a value of 100. The residuals, which would be randomly and evenly dispursed if the regression fit the data well, were also clumped to one side. It looks like there needs to be some kind of transformation of this data before a regression would be a good model choice. 
 
 ### b)
 
@@ -98,7 +96,7 @@ ggplot(pollution, aes(x = log_nox, y = mort))+
 
 #Run the regression and output a simple table 
 lmlog_nox_mort <- lm(mort ~ log_nox, data = pollution)
-pander(lmlog_nox_mort)
+kable(summary(lmlog_nox_mort)$coef, digits = 3)
 
 #Extract the residuals 
 lognoxmort_res <- resid(lmlog_nox_mort)
@@ -115,18 +113,18 @@ ggplot(data = pollution, aes(x = log_nox, y = lognoxmort_res))+
 
 ```
 
+Looking at the figures and table above, we can see that a regression is a better fit when the data is log transformed. More of the points fall along the line (or within its standard error zone) and the residual plot shows a less clumped distribution of points when compared to the previous figures in part a. 
 
 ### c)
 
 ```{r, echo=FALSE, fig.width=12, fig.height=6}
-#Interpret the slope coefficient from the model you chose in (b)
-pander(lmlog_nox_mort)
-#With every increase in 10^x, where x is nitric oxide pollution potential, 
-#there is an increase in mortality rate of 35.31 multiplied by x. 
 
+#Interpret the slope coefficient from the model you chose in (b)
+kable(summary(lmlog_nox_mort)$coef, digits = 3)
 
 ```
 
+With every increase in 10^x, where x is nitric oxide pollution potential, there is an increase in mortality rate of 35.31 multiplied by x. 
 
 ### d)
 
@@ -156,62 +154,45 @@ ggplot(data = pollution, aes(x = log_hc, y = mort)) +
 
 #Create regression that takes into account the effects of the other factors
 all_combined <- lm(mort ~ log_nox + log_hc + log_so2, data=pollution)
-pander(all_combined)
+kable(summary(all_combined)$coef, digits = 3)
+kable(confint(all_combined), digits = 3)
 
-#I don't know how to plot this??
-ggplot() +
-  geom_smooth(data = all_combined, method = "lm") +
-  geom_point(data = pollution, aes(log_nox,mort), colour = "blue") +
-  geom_point(data = pollution, aes(log_so2,mort), colour = "green")+
-  geom_point(data = pollution, aes(log_hc,mort), colour = "red")
+#I don't think there is a way to plot this new model without repeating the graphs above
+#or making the plot unreadable. 
 
 ```
 
+A similar pattern was observed in sulphur dioxide and hydrocarbon where the data needed to be log transformed, this can be seen in the two figures above. A linear model that takes into account all three factors can be seen in the tables above.The first shows is a summary of the model, while the second shows the confidence intervals. This can be understood in a similar way as in part C, where a 10^x increase in nitric oxide, sulpur dioxide, or hydrocarbons, corresponds with a 134x, -131x, and 27x respective change in mortality. 
 
 ### e)
 
 ```{r, echo=FALSE, fig.width=12, fig.height=6}
 
-x_orig <- data.frame(log_nox = pollution$log_nox[1:30], 
-                     log_hc = pollution$log_hc[1:30],
-                     log_so2 = pollution$log_so2[1:30])
+#Take 50% of the data and use it to predict the other half
+pollution_for_model <- pollution %>% sample_frac(0.5)
+pollution_predict <- setdiff(pollution, pollution_for_model)
 
-y <- pollution$mort[1:30]
+#first model using the first half of the data
+lm_model <- lm(mort ~ log_nox + log_hc + log_so2, data=pollution_for_model)
 
-lmfirst_half <- lm(y ~ log_nox + log_hc + log_so2, data=x_orig)
+#Predict that
+lm_model_predict <- predict(lm_model, pollution_predict)
 
-x_new <- data.frame(log_nox = pollution$log_nox[31:60], 
-                    log_hc = pollution$log_hc[31:60],
-                    log_so2 = pollution$log_so2[31:60])
-
-lmsecond_pred <- predict(lmfirst_half, x_new)
-
-ggplot(data = NULL, aes(x = pollution$mort[31:60], y = lmsecond_pred)) +
+#Graph to compare, all points on y=x line would be a perfect prediction
+ggplot(data = pollution_predict, aes(x = mort, y = lm_model_predict)) +
   geom_point() +
-  stat_smooth(method = "lm") +
+  geom_abline(intercept = 0, slope = 1) +
   labs(title = "How does a model handle new data?", 
        x = "Observed Mortality Rate",
        y = "Predicted Mortality Rate")
 
 ```
 
+The figure above represents a testing of the model. By taking a sample of 50% of the data, the model was created, and then tested against the other 50% of the data. A perfect fit would have all of the points falling on the line shown, the line of y=x. Because the model did not predict the distribution of the points effectively, there is somewhat of a clumping of points along the line, but there is still a large amount of variation. It is likely that this observation could be corrected with a larger dataset used to create the model, or perhaps a different kind of transformation of the data. 
 
 ### f) What do you think are the reasons for using cross-validation?
 
-It allows you to check if your model would work in the "real world". 
-If it is given a random set of new data, it should work for that data too, 
-and splitting the data into two parts is easier than going out and collecting more
-though it does limit the statistical power of your model because of the decreased sample size. 
-
-
-```{r, echo=FALSE, fig.width=12, fig.height=6}
-
-```
-
-
-
-
-
+It allows you to check if your model would work with new data. If it is given a random set of new data, it should work for that data too, and splitting the data into two parts is easier than going out and collecting more though it does limit the statistical power of your model because of the decreased sample size.  
 
 
 ## Question 2:
@@ -232,7 +213,7 @@ Lec09 to the project directory `HW-2`.
 profiles <- read.csv("profiles.csv", header=TRUE) %>% tbl_df()
 ```
 
-
+### How are body type identification and gender related? 
 ```{r, echo=FALSE, fig.width=12, fig.height=6}
 # Feel free to make multiple code blocks, but set echo, fig.width, fig.height as 
 # above
@@ -244,76 +225,114 @@ profiles <- select(profiles, -contains("essay"))
 #add a binary column for females
 profiles <- mutate(profiles, is.female = ifelse(sex=="f", 1, 0))
 
+#Filter out the ones that do not identify, since that is what we are interested in
+profiles <- filter(profiles, sex != "")
+
 #Lets find out what the body types are 
-body_types <- profiles %>% select(body_type,is.female) %>% 
-  group_by(body_type, is.female) %>% 
+body_types <- profiles %>% select(body_type,sex) %>% 
+  group_by(body_type, sex) %>% 
   tally()
 
-#Lets plot out those body types, and fill by gender. Can't figure out how to just 
-#make those values discrete for the legend, I could always just not have it and explain but eh. 
-#I guess I will go with the heteronormative blue and pink for now
-ggplot(data=body_types, aes(x=body_type, y = n, fill= is.female))+
-  geom_bar(stat = "identity")+
-  theme_tufte()+
-  scale_fill_gradient(low = "blue", high = "pink", guide = FALSE)+
-  theme(axis.text.x = element_text(angle = 90, vjust = 0.25, hjust = 1)) +
-  #scale_fill_discrete(name = "Key", labels = c(as.factor("Female"),as.factor("Male")))+
-  labs(title = "Body Type Prevalence by Gender", x = "Body Type", y = "Number of Individuals")
+#Now we need to correct these for proportions because there are more males on here
+#than females. 
+sum <- body_types %>% group_by(sex) %>% summarise(sum(n))
+f_tot <- sum[[1,2]]
+m_tot <- sum[[2,2]]
 
+#Here is the proportion 
+body_types <- body_types %>% mutate(prop = ifelse(sex == "f", n/f_tot, 
+                                                    ifelse(sex == "m", n/m_tot, NA)))
+
+#Looks like there are some blank body types, let's filter those out. Not having them 
+#doesn't affect the proportions of the others so does not bias the results. 
+body_types <- filter(body_types, body_type != "")
+
+#Lets plot out those body types, and fill by gender. 
+ggplot(data=body_types, aes(x=reorder(body_type, prop), y = prop, fill= sex)) +
+  geom_bar(stat = "identity", position = "dodge")+
+  theme_tufte()+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.25, hjust = 1)) +
+  scale_fill_discrete(name = "Key", labels = c("Female" , "Male"))+
+  labs(title = "Body Type Prevalence by Gender", x = "Body Type", y = "Proportion of Individuals")
+
+```
+
+The figure above shows how user's described their physique. Individuals were removed from the graph who did not include this description. Because it is proportional, the relative heigts of the bars can be used to directly compare females to males. Descriptions such as "curvy", "thin", or "full figured" were predominantly used by females, while "athletic" and "fit" were more commonly used by males. These words would have a higher likelihood of correctly identifying the listed sex of a user. There are many implications one can draw from the words used, and societal biases that led to the use of those terms. 
+
+### How are occupation and gender related? 
+```{r, echo=FALSE, fig.width=12, fig.height=6}
 #Lets look at occupations
 occupations <- profiles %>% select(job,is.female) %>% 
   group_by(job, is.female) %>% 
   tally()
 
+#Have to do some correcting again for the proportion issue
+prop_occupations <- profiles %>% 
+  select(job, is.female) %>% 
+  group_by(job) %>% 
+  summarise(female=sum(is.female)/n()) %>%
+  mutate(male = 1-female) %>% 
+  gather(sex, prop, -job)
+
+#Remove the ones that don't have a title for a job
+prop_occupations <- filter(prop_occupations, job != "")
+
 #Let's do the same as above, but for the different jobs
 #Remember to look at relative size of each color for each column, not necessarily comparing one
 #column to the next, these are absolutes, not proportions, and there are more men on okcupid. 
-ggplot(data=occupations, aes(x=job, y = n, fill= is.female))+
-  geom_bar(stat = "identity")+
+ggplot(data=prop_occupations, aes(x= reorder(job,prop), y = prop, fill= sex))+
+  geom_bar(stat = "identity", position = "dodge")+
   theme_tufte()+
-  scale_fill_gradient(low = "blue", high = "pink", guide = FALSE)+
   theme(axis.text.x = element_text(angle = 90, vjust = 0.25, hjust = 1)) +
-  #scale_fill_discrete(name = "Key", labels = c(as.factor("Female"),as.factor("Male")))+
-  labs(title = "Occupation by Gender", x = "Occupation", y = "Number of Individuals")
+  scale_fill_discrete(name = "Key", labels = c("Female" , "Male"))+
+  labs(title = "Occupation by Gender", x = "Occupation", y = "Proportion of Individuals")
 
+```
+
+The figure above shows how user's idenfitifed their occupation. User's that did not report an occupation were removed from this figure. Similar to body types, patterns in occupations can be seen in males and females. Careers such as "clerical/administrative" and "education/academia" were more commonly held by females, while "computer/hardware/software", "military", "construction/craftsmanship" "transportation", and "science/tech/engineering" were more likely to be held by men. These distributions stem from societal norms/pressures such as mostly men joining the military or working construction, and the predominance of men in Silicon Valley for science and tech jobs. To predict whether or not a user is female, it would be more effective to use some of these career options to predict that the user is *not* female.  
+
+### How are the user's location and gender related? 
+```{r, echo=FALSE, fig.width=12, fig.height=6}
 #Let's figure out their locations and see if there is a pattern there
 #First seperate the city and states
 profiles <- separate(profiles, location, c("city", "state"), sep = ",")
 
 #Do some grouping
-locations <- profiles %>% select(city,is.female) %>% 
-  group_by(city, is.female) %>% 
+locations <- profiles %>% select(city,sex) %>% 
+  group_by(city, sex) %>% 
   tally()
 
 #Here is a quick table for this data, before I filter out bits of it
 datatable(locations)
 
-#Filter out the ones that have less than 100 people from that location 
-locations <- locations %>% filter(n > 100)
+#Filter out the ones that have less than 100 people from that location, and group by size 
+locations_small <- locations %>% filter(n > 100, n < 1500)
+locations_large <- locations %>% filter(n > 1500)
 
-#Graph that! This looks stupid, should probably leave out SF as that is
-#balanced, but at the same time I don't really see much to go on. Maybe a map version of this
-#would be cooler 
-ggplot(data=locations, aes(x=city, y = n, fill= is.female))+
-  geom_bar(stat = "identity")+
+
+#Graphing the smaller locations
+ggplot(data=locations_small, aes(x=reorder(city,n), y = n, fill= sex))+
+  geom_bar(stat = "identity", position = "dodge")+
   theme_tufte()+
-  scale_fill_gradient(low = "blue", high = "pink", guide = FALSE)+
   theme(axis.text.x = element_text(angle = 90, vjust = 0.25, hjust = 1)) +
-  #scale_fill_discrete(name = "Key", labels = c(as.factor("Female"),as.factor("Male")))+
-  labs(title = "Where do different genders live?", x = "Location", y = "Number of Individuals")
+  scale_fill_discrete(name = "Key", labels = c("Female" , "Male"))+
+  labs(title = "Gender Distribution: Small Cities", x = "Location"
+       , y = "Number of Individuals")
 
-
-#Now plot the different cities
-ggplot(data=occupations, aes(x=job, y = n, fill= is.female))+
-  geom_bar(stat = "identity")+
+#Graphing the larger locations
+ggplot(data=locations_large, aes(x=reorder(city,n), y = n, fill= sex))+
+  geom_bar(stat = "identity", position = "dodge")+
   theme_tufte()+
-  scale_fill_gradient(low = "blue", high = "pink", guide = FALSE)+
   theme(axis.text.x = element_text(angle = 90, vjust = 0.25, hjust = 1)) +
-  #scale_fill_discrete(name = "Key", labels = c(as.factor("Female"),as.factor("Male")))+
-  labs(title = "Occupation by Gender", x = "Occupation", y = "Number of Individuals")
+  scale_fill_discrete(name = "Key", labels = c("Female" , "Male"))+
+  labs(title = "Gender Distribution: Large Cities", x = "Location"
+       , y = "Number of Individuals")
 
+```
 
-
+The table and figures above show how users are distributed by sex, geographically. These values are in total number of individuals. This is done so that one can see how there are more men than women on the site, and there are locations where only men are users. These locations, such as lafayette have 100+ users that are all male. A proportion would be misleading as it would be difficult to ascertain the sample size. The three largest cities have been separated out as they have a larger population than the cities by a large margin. It looks again like using some of the cities to predict which users are likely to *not* be female would be a more worthwhile use of this data. 
+### How are the word's one uses and gender related? 
+```{r, echo=FALSE, fig.width=12, fig.height=6}
 #Searching for words functions, first finding it, then returning found word 
 find_query <- function(char.vector, query){
   which.has.query <- grep(query, char.vector, ignore.case = TRUE)
@@ -326,38 +345,33 @@ profile_has_word <- function(data.frame, query){
 }
 
 # Search for the string "read"
-profiles$has.read <- profile_has_word(data.frame = essays, query = "read")
+profiles$has_read <- profile_has_word(data.frame = essays, query = "read")
 
-#Making a proportion here. I am trying to understand exaclty what the proportions mean.
-#Is there a way to pull males out of this, is it just "1-value"? Don't really
-#understand. 
-group_by(profiles, has.read) %>% 
-  summarise(prop_female=mean(is.female)) %>% 
-  kable(., digits = 3)
+#Create a table with the proportion info in it
+read_table <- group_by(profiles, has_read) %>% 
+  summarise(prop_female=mean(is.female)) %>% spread(has_read, prop_female)
 
 #Same thing here but for "love" instead of the word "read"
-profiles$has.love <- profile_has_word(data.frame = essays, query = "love")
-group_by(profiles, has.love) %>% 
-  summarise(prop_female=mean(is.female)) %>% 
-  kable(., digits = 3)
+profiles$has_love <- profile_has_word(data.frame = essays, query = "love")
+love_table <- group_by(profiles, has_love) %>% 
+  summarise(prop_female=mean(is.female)) %>% spread(has_love, prop_female)
 
-#I am slowly but surely painting myself as a sexist..."cook" 
-profiles$has.cook <- profile_has_word(data.frame = essays, query = "cook")
-group_by(profiles, has.cook) %>% 
-  summarise(prop_female=mean(is.female)) %>% 
-  kable(., digits = 3)
+#Again for cook
+profiles$has_cook <- profile_has_word(data.frame = essays, query = "cook")
+cook_table <- group_by(profiles, has_cook) %>% 
+  summarise(prop_female=mean(is.female)) %>% spread(has_cook, prop_female)
 
-#Looks like I have no shame..."bake"
-profiles$has.bake <- profile_has_word(data.frame = essays, query = "bake")
-group_by(profiles, has.bake) %>% 
-  summarise(prop_female=mean(is.female)) %>% 
-  kable(., digits = 3)
+#Finally for bake
+profiles$has_bake <- profile_has_word(data.frame = essays, query = "bake")
+bake_table <- group_by(profiles, has_bake) %>% 
+  summarise(prop_female=mean(is.female)) %>% spread(has_bake, prop_female)
 
+#Combine all into one and output as table
+word_table <- bind_rows(read_table, love_table, cook_table, bake_table)
+word_table <- as.data.frame(word_table)
+row.names(word_table) <- c("read", "love", "cook", "bake")
+kable(word_table)
 
 ```
 
-
-```{r, echo=FALSE, fig.width=12, fig.height=6}
-# Feel free to make multiple code blocks, but set echo, fig.width, fig.height as 
-# above
-```
+The table above shows four different words and proportions of users with those words in their essays. There are two ways one could interpret each word. For example, of the people who *don't* have the word "read" in their profiles, 37% are female. Of the people who *do* have the word "read" in their profiles, 43% are female.The percentages are relatively similar for all of the terms, but "bake" does have over 50% of people who do have that word in their profile being women. 
